@@ -24,7 +24,7 @@ def fetch_arxiv_papers():
         sort_by=arxiv.SortCriterion.SubmittedDate
     )
     papers = []
-    for res in search.results():
+    for res in search.results:
         papers.append({
             "title": res.title,
             "authors": [a.name for a in res.authors],
