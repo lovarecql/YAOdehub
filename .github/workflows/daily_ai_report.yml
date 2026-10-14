@@ -1,0 +1,38 @@
+name: Daily AI Frontier Report
+on:
+  schedule:
+    # UTC 早上6点自动跑，按需修改cron
+    - cron: "0 6 * * *"
+  workflow_dispatch: # 网页手动触发测试
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install arxiv requests beautifulsoup4 openai
+
+      - name: Run AI Research Agent
+        env:
+          # 密钥变量名改成 DEEPSEEK_API_KEY
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: python daily_agent.py
+
+      - name: Commit generated report
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "bot@github.com"
+          git add reports/*.md
+          git commit -m "🤖 Auto update daily AI report $(date +%Y-%m-%d)" || echo "No new changes"
+          git push
