@@ -14,17 +14,18 @@ llm_client = OpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
     base_url="https://api.deepseek.com"
 )
-MODEL_NAME = "deepseek-flash" # 换成 deepseek-v4-pro 就是更强版本
+MODEL_NAME = "deepseek-flash"
 
-# 1. Agent工具1：抓取arXiv今日AI论文
+# 1. 修复版：抓取arXiv论文（适配最新版arxiv库）
 def fetch_arxiv_papers():
+    client = arxiv.Client()
     search = arxiv.Search(
         query="cat:cs.AI OR cat:cs.LG OR cat:cs.CV",
         max_results=8,
         sort_by=arxiv.SortCriterion.SubmittedDate
     )
     papers = []
-    for res in search.results:
+    for res in client.results(search):
         papers.append({
             "title": res.title,
             "authors": [a.name for a in res.authors],
