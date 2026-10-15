@@ -33,6 +33,6 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "bot@github.com"
-          git add reports/*.md
+          git add reports/ .nojekyll index.html
           git commit -m "🤖 Auto update daily AI report $(date +%Y-%m-%d)" || echo "No new changes"
           git push

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 前沿日报</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.3/dist/purify.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --panel-2: #1e222b;
+      --border: #2a2f3a;
+      --text: #e6e9ef;
+      --muted: #8b93a3;
+      --accent: #5b8cff;
+      --accent-soft: rgba(91, 140, 255, 0.14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: rgba(15, 17, 21, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+    header h1 { font-size: 18px; margin: 0; font-weight: 650; }
+    header .sub { color: var(--muted); font-size: 13px; }
+    .layout { display: flex; min-height: calc(100vh - 65px); }
+    aside {
+      width: 280px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      padding: 16px 12px;
+      overflow-y: auto;
+      background: var(--panel);
+    }
+    aside .count { color: var(--muted); font-size: 12px; padding: 0 10px 10px; }
+    aside button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 11px 12px;
+      margin-bottom: 6px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    aside button:hover { background: var(--panel-2); }
+    aside button.active { background: var(--accent-soft); border-color: var(--accent); }
+    aside button .date { font-weight: 600; }
+    aside button .title { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
+    main { flex: 1; padding: 28px 40px; max-width: 860px; }
+    .loading, .error, .empty {
+      color: var(--muted);
+      padding: 60px 0;
+      text-align: center;
+    }
+    .error { color: #ff8f8f; }
+    .article {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px 36px;
+    }
+    .article h1 { font-size: 24px; margin-top: 0; }
+    .article h2 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .article h3 { font-size: 16px; }
+    .article a { color: var(--accent); }
+    .article code {
+      background: var(--panel-2);
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-size: 13px;
+    }
+    .article pre {
+      background: var(--panel-2);
+      padding: 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .article pre code { background: none; padding: 0; }
+    .article blockquote {
+      margin: 12px 0;
+      padding: 8px 16px;
+      border-left: 3px solid var(--accent);
+      background: var(--panel-2);
+      border-radius: 0 8px 8px 0;
+      color: var(--muted);
+    }
+    .article hr { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+    .article img { max-width: 100%; }
+    @media (max-width: 720px) {
+      .layout { flex-direction: column; }
+      aside { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+      main { padding: 20px; }
+      .article { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🤖 AI 前沿日报</h1>
+    <span class="sub" id="headerSub"></span>
+  </header>
+  <div class="layout">
+    <aside id="sidebar">
+      <div class="count" id="count"></div>
+      <div id="reportList"></div>
+    </aside>
+    <main id="content">
+      <div class="loading">正在加载日报…</div>
+    </main>
+  </div>
+
+  <script>
+    const INDEX_URL = "reports/index.json";
+    const REPORTS_DIR = "reports/";
+
+    const content = document.getElementById("content");
+    const reportList = document.getElementById("reportList");
+    const countEl = document.getElementById("count");
+    const headerSub = document.getElementById("headerSub");
+
+    function showLoading() {
+      content.innerHTML = '<div class="loading">正在加载日报…</div>';
+    }
+
+    function showError(msg) {
+      content.innerHTML = '<div class="error">' + msg + "</div>";
+    }
+
+    function renderMarkdown(text) {
+      if (typeof marked === "undefined") {
+        return "<pre>" + escapeHtml(text) + "</pre>";
+      }
+      const html = marked.parse(text);
+      if (typeof DOMPurify !== "undefined") {
+        return DOMPurify.sanitize(html);
+      }
+      return html;
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function openExternalLinks(container) {
+      container.querySelectorAll("a").forEach(function (a) {
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+      });
+    }
+
+    async function loadReport(file) {
+      showLoading();
+      document.querySelectorAll("#reportList button").forEach(function (b) {
+        b.classList.toggle("active", b.dataset.file === file);
+      });
+      try {
+        const resp = await fetch(REPORTS_DIR + file);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const text = await resp.text();
+        content.innerHTML = '<div class="article">' + renderMarkdown(text) + "</div>";
+        openExternalLinks(content);
+      } catch (e) {
+        showError("加载日报失败：" + file + "（" + e.message + "）。如果是本地预览，请用 python -m http.server 启动。");
+      }
+    }
+
+    async function init() {
+      try {
+        const resp = await fetch(INDEX_URL);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        const reports = data.reports || [];
+        countEl.textContent = "共 " + reports.length + " 篇日报";
+        headerSub.textContent = data.updated ? "更新于 " + data.updated : "";
+
+        if (reports.length === 0) {
+          content.innerHTML = '<div class="empty">还没有日报，等待第一次运行。</div>';
+          return;
+        }
+
+        reports.forEach(function (r) {
+          const btn = document.createElement("button");
+          btn.dataset.file = r.file;
+          btn.innerHTML = '<span class="date">📅 ' + escapeHtml(r.date) + '</span>' +
+            '<span class="title">' + escapeHtml(r.title) + "</span>";
+          btn.addEventListener("click", function () {
+            loadReport(r.file);
+          });
+          reportList.appendChild(btn);
+        });
+
+        loadReport(reports[0].file);
+      } catch (e) {
+        showError("加载日报索引失败：" + e.message + "。请确认仓库已包含 reports/index.json，或改用 python -m http.server 本地预览。");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

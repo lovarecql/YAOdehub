@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from datetime import datetime
 import os
+import glob
+import json
 
 # ========= 配置 =========
 today = datetime.now().strftime("%Y-%m-%d")
@@ -55,6 +57,28 @@ def generate_report(papers):
     )
     return resp.choices[0].message.content
 
+
+# 3. 重建日报索引，供网页读取
+def rebuild_index():
+    report_files = sorted(glob.glob("reports/*_ai_daily.md"), reverse=True)
+    reports = []
+    for path in report_files:
+        filename = os.path.basename(path)
+        date = filename.split("_")[0]
+        reports.append({
+            "date": date,
+            "file": filename,
+            "title": f"AI前沿日报 {date}"
+        })
+    with open("reports/index.json", "w", encoding="utf-8") as f:
+        json.dump(
+            {"updated": reports[0]["date"] if reports else "", "reports": reports},
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
+    print(f"✅ 索引已更新，共 {len(reports)} 篇报告")
+
 if __name__ == "__main__":
     papers = fetch_arxiv_papers()
     md_report = generate_report(papers)
@@ -62,4 +86,5 @@ if __name__ == "__main__":
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(f"# 🤖 AI前沿日报 | {today}\n\n")
         f.write(md_report)
+    rebuild_index()
     print(f"✅ 报告生成完成，保存到 {OUTPUT_PATH}")
