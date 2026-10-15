@@ -3,12 +3,15 @@ import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 import glob
 import json
+import time
 
 # ========= 配置 =========
-today = datetime.now().strftime("%Y-%m-%d")
+BEIJING_TZ = ZoneInfo("Asia/Shanghai")
+today = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d")
 OUTPUT_PATH = f"reports/{today}_ai_daily.md"
 
 # 【DeepSeek 配置】
@@ -18,9 +21,9 @@ llm_client = OpenAI(
 )
 MODEL_NAME = "deepseek-flash"
 
-# 1. 修复版：抓取arXiv论文（适配最新版arxiv库）
+# 1. 修复版：抓取arXiv论文（适配最新版arxiv库，加重试以应对限流）
 def fetch_arxiv_papers():
-    client = arxiv.Client()
+    client = arxiv.Client(num_retries=5, delay_seconds=5)
     search = arxiv.Search(
         query="cat:cs.AI OR cat:cs.LG OR cat:cs.CV",
         max_results=8,
@@ -35,6 +38,18 @@ def fetch_arxiv_papers():
             "url": res.entry_id
         })
     return papers
+
+
+def fetch_arxiv_papers_with_retry(max_attempts=4):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fetch_arxiv_papers()
+        except arxiv.HTTPError:
+            if attempt == max_attempts:
+                raise
+            wait = 15 * attempt
+            print(f"⚠️ arXiv 限流(429)，{wait} 秒后重试（第 {attempt} 次）")
+            time.sleep(wait)
 
 # 2. Agent汇总+DeepSeek生成报告
 def generate_report(papers):
@@ -80,7 +95,7 @@ def rebuild_index():
     print(f"✅ 索引已更新，共 {len(reports)} 篇报告")
 
 if __name__ == "__main__":
-    papers = fetch_arxiv_papers()
+    papers = fetch_arxiv_papers_with_retry()
     md_report = generate_report(papers)
     # 写入md文件
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
