@@ -1,8 +1,8 @@
 name: Daily AI Frontier Report
 on:
   schedule:
-    # UTC 早上6点自动跑，按需修改cron
-    - cron: "0 6 * * *"
+    # UTC 0点 = 北京时间早上8点，按需修改cron
+    - cron: "0 0 * * *"
   workflow_dispatch: # 网页手动触发测试
 
 jobs:
