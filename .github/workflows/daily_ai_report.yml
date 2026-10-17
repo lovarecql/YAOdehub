@@ -1,13 +1,14 @@
 name: Daily AI Frontier Report
 on:
   schedule:
-    # UTC 0点 = 北京时间早上8点，按需修改cron
-    - cron: "0 0 * * *"
-  workflow_dispatch: # 网页手动触发测试
+    # UTC 3点 = 北京时间上午11点（避开 arXiv 早高峰的限流）
+    - cron: "2 3 * * *"
+  workflow_dispatch: # Actions 页面手动触发
 
 jobs:
   run-agent:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # 超时保护
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -25,14 +26,14 @@ jobs:
 
       - name: Run AI Research Agent
         env:
-          # 密钥变量名改成 DEEPSEEK_API_KEY
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: python daily_agent.py
 
       - name: Commit generated report
+        if: success()  # 只有脚本成功才 commit
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "bot@github.com"
           git add reports/ .nojekyll index.html
-          git commit -m "🤖 Auto update daily AI report $(date +%Y-%m-%d)" || echo "No new changes"
+          git commit -m "🤖 Auto update daily AI report $(date -u +%Y-%m-%d)" || echo "No new changes"
           git push
